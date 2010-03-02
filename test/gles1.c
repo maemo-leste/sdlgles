@@ -76,7 +76,7 @@ int main()
 	screen = SDL_SetVideoMode(0, 0, 16, SDL_SWSURFACE);
 	assert(screen);
 
-	SDL_WM_SetCaption("SDLgles v1 test");
+	SDL_WM_SetCaption("SDLgles v1 test", "SDLgles v1 test");
 	SDL_ShowCursor(SDL_DISABLE);
 
 	SDL_TimerID timer = SDL_AddTimer(30, tick, NULL);

@@ -117,7 +117,7 @@ int main()
 	screen = SDL_SetVideoMode(0, 0, 16, SDL_SWSURFACE);
 	assert(screen);
 
-	SDL_WM_SetCaption("SDLgles v2 test");
+	SDL_WM_SetCaption("SDLgles v2 test", "SDLgles v2 test");
 	SDL_ShowCursor(SDL_DISABLE);
 
 	context = SDL_GLES_CreateContext();
