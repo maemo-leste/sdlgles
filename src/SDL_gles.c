@@ -63,7 +63,7 @@ static EGLint attrib_list[] = {
 	EGL_LEVEL,					0,
 	EGL_NATIVE_RENDERABLE,		EGL_DONT_CARE,
 	EGL_NATIVE_VISUAL_TYPE,		EGL_DONT_CARE,
-	EGL_RENDERABLE_TYPE,		EGL_OPENGL_BIT,
+	EGL_RENDERABLE_TYPE,		0,
 	EGL_SAMPLE_BUFFERS,			0,
 	EGL_SAMPLES,				0,
 	EGL_STENCIL_SIZE,			0,
@@ -162,6 +162,8 @@ static int set_egl_context_attrib(EGLenum attrib, EGLint value)
 
 int SDL_GLES_LoadLibrary(const char *path)
 {
+	/* If path is NULL, try first to use path from SDL_VIDEO_GL_DRIVER,
+	 * otherwise use a sane default depending on selected GLES version. */
 	if (!path) {
 		path = getenv("SDL_VIDEO_GL_DRIVER");
 		if (!path) {
@@ -204,6 +206,7 @@ int SDL_GLES_Init(SDL_GLES_Version version)
 		return -1;
 	}
 
+	/* We use the SDL GFX display (we're using the GFX window too after all) */
 	display = info.info.x11.gfxdisplay;
 
 	egl_display = eglGetDisplay((EGLNativeDisplayType)display);
@@ -219,13 +222,22 @@ int SDL_GLES_Init(SDL_GLES_Version version)
 		return -2;
 	}
 
+	/* Configure some context attributes and bind the required API now. */
+	EGLenum api_to_bind = EGL_OPENGL_ES_API;
 	gl_version = version;
 	switch (gl_version) {
 		case SDL_GLES_VERSION_1_1:
-			/* defaults are OK */
+			/* OpenGL|ES 1.1 */
+			api_to_bind = EGL_OPENGL_ES_API;
+			/* filter non ES 1.0 renderable configurations */
+			res = set_egl_attrib(EGL_RENDERABLE_TYPE, EGL_OPENGL_ES_BIT) == 0;
+			assert(res);
+			/* default egl_context_client_version is OK */
 			break;
 		case SDL_GLES_VERSION_2_0:
-			/* by default, set egl renderable type attribute to GL ES 2 */
+			/* OpenGL|ES 2.0 */
+			api_to_bind = EGL_OPENGL_ES_API; /* Note: no EGL_OPENGL_ES2_API */
+			/* filter non ES 2.0 renderable configurations */
 			res = set_egl_attrib(EGL_RENDERABLE_TYPE, EGL_OPENGL_ES2_BIT) == 0;
 			assert(res);
 			/* and request GL ES 2.0 contexts */
@@ -233,7 +245,14 @@ int SDL_GLES_Init(SDL_GLES_Version version)
 			assert(res);
 			break;
 		default:
-			break;
+			SDL_SetError("Unsupported API version");
+			return -1;
+	}
+
+	res = eglBindAPI(api_to_bind);
+	if (!res) {
+		SDL_SetError("EGL failed to bind the required API");
+		return -2;
 	}
 
 	return 0;
@@ -241,11 +260,26 @@ int SDL_GLES_Init(SDL_GLES_Version version)
 
 void SDL_GLES_Quit()
 {
+	/* Close the loaded GL library (if any) */
 	if (gl_handle) {
 		dlclose(gl_handle);
 		gl_handle = NULL;
 	}
+	/* Unallocate most stuff we can unallocate. */
 	if (egl_display != EGL_NO_DISPLAY) {
+		eglMakeCurrent(egl_display, EGL_NO_SURFACE, EGL_NO_SURFACE,
+			EGL_NO_CONTEXT);
+
+		if (cur_context) {
+			eglDestroyContext(egl_display, cur_context->egl_context);
+			free(cur_context);
+			cur_context = 0;
+		}
+		if (egl_surface != EGL_NO_SURFACE) {
+			eglDestroySurface(egl_display, egl_surface);
+			egl_surface = EGL_NO_SURFACE;
+		}
+
 		eglTerminate(egl_display);
 		egl_display = EGL_NO_DISPLAY;
 	}
@@ -363,23 +397,6 @@ int SDL_GLES_MakeCurrent(SDL_GLES_Context* c)
 	if (res != 0) return res; /* Surface (re-)creation failed. */
 
 	/* TODO Update attrib_list. Make SDL_GLES_GetAttribute work. */
-
-	if (cur_context) {
-		/* If selecting a new context, bind the required API. */
-		switch (gl_version) {
-			case SDL_GLES_VERSION_1_1:
-			case SDL_GLES_VERSION_2_0:
-				res = eglBindAPI(EGL_OPENGL_ES_API);
-				if (!res) {
-					SDL_SetError("EGL failed to bind the required API: %s",
-						get_error_string(eglGetError()));
-					return -2;
-				}
-				break;
-			default:
-				break;
-		}
-	}
 
 	return 0;
 }
