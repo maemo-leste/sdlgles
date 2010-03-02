@@ -18,7 +18,7 @@
 static SDL_Surface *screen;
 static SDL_GLES_Context *context;
 
-static float box_step = 0.05f;
+static float box_step = 0.025f;
 
 static const float w = 0.28f, h = 0.4f;
 static float x = -0.5f, y = 0.0f;
@@ -76,9 +76,10 @@ int main()
 	screen = SDL_SetVideoMode(0, 0, 16, SDL_SWSURFACE);
 	assert(screen);
 
+	SDL_WM_SetCaption("SDLgles v1 test");
 	SDL_ShowCursor(SDL_DISABLE);
 
-	SDL_TimerID timer = SDL_AddTimer(50, tick, NULL);
+	SDL_TimerID timer = SDL_AddTimer(30, tick, NULL);
 	assert(timer != NULL);
 
 	context = SDL_GLES_CreateContext();

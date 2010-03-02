@@ -55,6 +55,7 @@ static EGLint attrib_list[] = {
 	EGL_RED_SIZE,				0,
 	EGL_GREEN_SIZE,				0,
 	EGL_BLUE_SIZE,				0,
+	EGL_LUMINANCE_SIZE,			0,
 	EGL_ALPHA_SIZE,				0,
 	EGL_CONFIG_CAVEAT,			EGL_DONT_CARE,
 	EGL_CONFIG_ID,				EGL_DONT_CARE,
@@ -62,6 +63,7 @@ static EGLint attrib_list[] = {
 	EGL_LEVEL,					0,
 	EGL_NATIVE_RENDERABLE,		EGL_DONT_CARE,
 	EGL_NATIVE_VISUAL_TYPE,		EGL_DONT_CARE,
+	EGL_RENDERABLE_TYPE,		EGL_OPENGL_BIT,
 	EGL_SAMPLE_BUFFERS,			0,
 	EGL_SAMPLES,				0,
 	EGL_STENCIL_SIZE,			0,
@@ -72,6 +74,12 @@ static EGLint attrib_list[] = {
 	EGL_TRANSPARENT_BLUE_VALUE,	EGL_DONT_CARE,
 	EGL_NONE
 };
+static EGLint context_attrib_list[] = {
+	EGL_CONTEXT_CLIENT_VERSION,	1,
+	EGL_NONE
+};
+static const int attrib_list_size = (sizeof(attrib_list) / sizeof(EGLint)) / 2;
+static const int context_attrib_list_size = (sizeof(context_attrib_list) / sizeof(EGLint)) / 2;
 static SDL_GLES_ContextPriv *cur_context = NULL;
 
 static const char * get_error_string(int error) {
@@ -109,6 +117,47 @@ static const char * get_error_string(int error) {
 		default:
 			return "EGL_UNKNOWN_ERROR";
     }
+}
+
+static int set_egl_attrib(EGLenum attrib, EGLint value)
+{
+	const EGLint a = attrib;
+	int i;
+	for (i = 0; i < attrib_list_size; i++) {
+		if (attrib_list[i * 2] == a) {
+			attrib_list[(i*2)+1] = value;
+			return 0;
+		}
+	}
+
+	return -1;
+}
+
+static EGLint get_egl_attrib(EGLenum attrib)
+{
+	const EGLint a = attrib;
+	int i;
+	for (i = 0; i < attrib_list_size; i++) {
+		if (attrib_list[i * 2] == a) {
+			return attrib_list[(i*2)+1];
+		}
+	}
+
+	return -1;
+}
+
+static int set_egl_context_attrib(EGLenum attrib, EGLint value)
+{
+	const EGLint a = attrib;
+	int i;
+	for (i = 0; i < context_attrib_list_size; i++) {
+		if (context_attrib_list[i * 2] == a) {
+			context_attrib_list[(i*2)+1] = value;
+			return 0;
+		}
+	}
+
+	return -1;
 }
 
 int SDL_GLES_LoadLibrary(const char *path)
@@ -171,6 +220,22 @@ int SDL_GLES_Init(SDL_GLES_Version version)
 	}
 
 	gl_version = version;
+	switch (gl_version) {
+		case SDL_GLES_VERSION_1_1:
+			/* defaults are OK */
+			break;
+		case SDL_GLES_VERSION_2_0:
+			/* by default, set egl renderable type attribute to GL ES 2 */
+			res = set_egl_attrib(EGL_RENDERABLE_TYPE, EGL_OPENGL_ES2_BIT) == 0;
+			assert(res);
+			/* and request GL ES 2.0 contexts */
+			res = set_egl_context_attrib(EGL_CONTEXT_CLIENT_VERSION, 2) == 0;
+			assert(res);
+			break;
+		default:
+			break;
+	}
+
 	return 0;
 }
 
@@ -253,12 +318,19 @@ SDL_GLES_Context* SDL_GLES_CreateContext(void)
 	if (!res || num_config < 1) {
 		SDL_SetError("EGL failed to find any valid config with required attributes: %s",
 			get_error_string(eglGetError()));
+		free(context);
 		return NULL;
 	}
 
 	context->egl_config = configs[0];
 	context->egl_context = eglCreateContext(egl_display, configs[0],
-		EGL_NO_CONTEXT, NULL);
+		EGL_NO_CONTEXT, context_attrib_list);
+	if (context->egl_context == EGL_NO_CONTEXT) {
+		SDL_SetError("EGL failed to create context: %s",
+			get_error_string(eglGetError()));
+		free(context);
+		return NULL;
+	}
 
 	return (SDL_GLES_Context*) context;
 }
@@ -292,18 +364,21 @@ int SDL_GLES_MakeCurrent(SDL_GLES_Context* c)
 
 	/* TODO Update attrib_list. Make SDL_GLES_GetAttribute work. */
 
-	switch (gl_version) {
-		case SDL_GLES_VERSION_1_1:
-		case SDL_GLES_VERSION_2_0:
-			res = eglBindAPI(EGL_OPENGL_ES_API);
-			if (!res) {
-				SDL_SetError("EGL failed to bind the required API: %s",
-					get_error_string(eglGetError()));
-				return -2;
-			}
-			break;
-		default:
-			break;
+	if (cur_context) {
+		/* If selecting a new context, bind the required API. */
+		switch (gl_version) {
+			case SDL_GLES_VERSION_1_1:
+			case SDL_GLES_VERSION_2_0:
+				res = eglBindAPI(EGL_OPENGL_ES_API);
+				if (!res) {
+					SDL_SetError("EGL failed to bind the required API: %s",
+						get_error_string(eglGetError()));
+					return -2;
+				}
+				break;
+			default:
+				break;
+		}
 	}
 
 	return 0;
