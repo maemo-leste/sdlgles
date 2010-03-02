@@ -46,10 +46,9 @@ extern DECLSPEC int SDLCALL SDL_GLES_Init(SDL_GLES_Version version);
   */
 extern DECLSPEC void SDLCALL SDL_GLES_Quit();
 
-/* Equivalent to SDL/GL ones. Untested. */
 /** Call before calling GetProcAddress. Dynamically loads a GLES library.
   * @param path full path to the library to load, or leave as NULL to load
-  *		the default GL ES library to the version specified in SDL_GLES_Init().
+  *		the default GL ES library (version as specified in SDL_GLES_Init()).
   * @return 0 if everything went OK.
   */
 extern DECLSPEC int SDLCALL SDL_GLES_LoadLibrary(const char *path);

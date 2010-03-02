@@ -189,6 +189,7 @@ void SDL_GLES_Quit()
 int SDL_GLES_SetVideoMode()
 {
 	SDL_SysWMinfo info;
+	EGLBoolean res;
 
 	SDL_VERSION(&info.version);
 	if (SDL_GetWMInfo(&info) != 1) {
@@ -198,20 +199,38 @@ int SDL_GLES_SetVideoMode()
 
 	/* Destroy previous surface, if any. */
 	if (egl_surface != EGL_NO_SURFACE) {
+		/* Ensure the surface is not the current one,
+		 * thus freeing memory earlier. */
+		eglMakeCurrent(egl_display, EGL_NO_SURFACE, EGL_NO_SURFACE,
+			 EGL_NO_CONTEXT);
 		eglDestroySurface(egl_display, egl_surface);
 		egl_surface = EGL_NO_SURFACE;
 	}
 
-	/* No current context? Quietly defer surface creation. */
+	/* No current context? Quietly defer surface creation.
+	 * Surface will be created on the call to MakeCurrent. */
 	if (!cur_context) {
 		return 0;
 	}
 
+	/* Create the new window surface. */
 	egl_surface = eglCreateWindowSurface(egl_display, cur_context->egl_config,
 		(EGLNativeWindowType)info.info.x11.window, NULL);
 	if (egl_surface == EGL_NO_SURFACE) {
 		SDL_SetError("EGL failed to create a window surface: %s",
 			get_error_string(eglGetError()));
+		return -2;
+	}
+
+	/* New surface created. Make it active. */
+	assert(cur_context && cur_context->egl_context != EGL_NO_CONTEXT);
+	res = eglMakeCurrent(egl_display, egl_surface, egl_surface,
+		cur_context->egl_context);
+
+	if (!res) {
+		SDL_SetError("EGL failed to change current surface: %s",
+			get_error_string(eglGetError()));
+		cur_context = NULL;
 		return -2;
 	}
 
@@ -263,29 +282,15 @@ int SDL_GLES_MakeCurrent(SDL_GLES_Context* c)
 	SDL_GLES_ContextPriv *context = (SDL_GLES_ContextPriv*)c;
 	int res;
 
-	if (context) {
-		cur_context = context;
+	cur_context = context;
 
-		res = SDL_GLES_SetVideoMode();
-		if (res != 0) return res; /* Surface (re-)creation failed. */
+	/* SDL_GLES_SetVideoMode() will appropiately clear the current context
+	 * (and surface), then create a new surface matching the selected context
+	 * config and make both the surface and the context the active ones. */
+	res = SDL_GLES_SetVideoMode();
+	if (res != 0) return res; /* Surface (re-)creation failed. */
 
-		res = eglMakeCurrent(egl_display, egl_surface, egl_surface,
-			context->egl_context);
-
-		if (!res) {
-			SDL_SetError("EGL failed to make current: %s",
-				get_error_string(eglGetError()));
-			cur_context = NULL;
-			return -2;
-		}
-	} else {
-		eglMakeCurrent(egl_display,	EGL_NO_SURFACE, EGL_NO_SURFACE,
-			EGL_NO_CONTEXT);
-		cur_context = NULL;
-		SDL_GLES_SetVideoMode(); /* Will clear current surface. */
-	}
-
-	// TODO Update attrib_list
+	/* TODO Update attrib_list. Make SDL_GLES_GetAttribute work. */
 
 	switch (gl_version) {
 		case SDL_GLES_VERSION_1_1:

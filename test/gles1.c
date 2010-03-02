@@ -18,11 +18,12 @@
 static SDL_Surface *screen;
 static SDL_GLES_Context *context;
 
-static float box_step = 0.1f;
+static float box_step = 0.05f;
 
 static const float w = 0.28f, h = 0.4f;
-static float x = -1.0f, y = 0.0f;
+static float x = -0.5f, y = 0.0f;
 static float box_v[4*3];
+static bool fullscreen = false;
 
 static Uint32 tick(Uint32 interval, void* param)
 {
@@ -30,7 +31,7 @@ static Uint32 tick(Uint32 interval, void* param)
 	e.type = SDL_VIDEOEXPOSE;
 
 	x += box_step;
-	if (x >= 1.0f || x <= -1.0f) {
+	if ((x + w/2)  >= 1.0f || (x - w/2) <= -1.0f) {
 		box_step *= -1.0f;
 	}
 
@@ -42,9 +43,25 @@ static Uint32 tick(Uint32 interval, void* param)
 	box_v[6] = x1; box_v[7] = y2;  box_v[8] = z;
 	box_v[9] = x2; box_v[10] = y2; box_v[11] = z;
 
-	SDL_PushEvent(&e);
+	SDL_PushEvent(&e); /* Since SDL calls timers in another thread, we cannot
+						  call rendering functions from here. */
 
 	return interval;
+}
+
+static void toggle_fullscreen()
+{
+	int res;
+
+	fullscreen = !fullscreen;
+
+	screen = SDL_SetVideoMode(0, 0, 16, SDL_SWSURFACE |
+		(fullscreen ? SDL_FULLSCREEN : 0));
+	assert(screen);
+
+	res = SDL_GLES_SetVideoMode();
+	if (res != 0) puts(SDL_GetError());
+	assert(res == 0);
 }
 
 int main()
@@ -59,14 +76,17 @@ int main()
 	screen = SDL_SetVideoMode(0, 0, 16, SDL_SWSURFACE);
 	assert(screen);
 
-	SDL_TimerID timer = SDL_AddTimer(10, tick, NULL);
+	SDL_ShowCursor(SDL_DISABLE);
+
+	SDL_TimerID timer = SDL_AddTimer(50, tick, NULL);
 	assert(timer != NULL);
 
 	context = SDL_GLES_CreateContext();
 	assert(context);
 
-	SDL_GLES_MakeCurrent(context);
-	
+	res = SDL_GLES_MakeCurrent(context);
+	assert(res == 0);
+
 	glMatrixMode(GL_MODELVIEW);
 	glLoadIdentity();
 
@@ -84,6 +104,9 @@ int main()
 				glClear(GL_COLOR_BUFFER_BIT);
 				glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
 				SDL_GLES_SwapBuffers();
+				break;
+			case SDL_MOUSEBUTTONDOWN:
+				toggle_fullscreen();
 				break;
 		}
 	}
