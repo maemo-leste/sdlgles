@@ -121,7 +121,6 @@ int main()
 	SDL_ShowCursor(SDL_DISABLE);
 
 	context = SDL_GLES_CreateContext();
-	if (!context) puts(SDL_GetError());
 	assert(context);
 
 	res = SDL_GLES_MakeCurrent(context);
