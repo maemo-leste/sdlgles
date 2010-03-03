@@ -32,6 +32,18 @@ typedef enum SDL_GLES_Version
 	SDL_GLES_VERSION_2_0 = 2
 } SDL_GLES_Version;
 
+typedef enum SDL_GLES_Attr
+{
+	SDL_GLES_BUFFER_SIZE = 0,
+	SDL_GLES_RED_SIZE,
+	SDL_GLES_GREEN_SIZE,
+	SDL_GLES_BLUE_SIZE,
+	SDL_GLES_ALPHA_SIZE,
+	SDL_GLES_LUMINANCE_SIZE,
+	SDL_GLES_DEPTH_SIZE,
+	SDL_GLES_STENCIL_SIZE
+} SDL_GLES_Attr;
+
 typedef struct SDL_GLES_Context
 {
 	/* Opaque pointer to an EGLContext */
@@ -85,6 +97,21 @@ extern DECLSPEC int SDLCALL SDL_GLES_MakeCurrent(SDL_GLES_Context *context);
   * and want to draw the color buffer contents to the window surface.
   */
 extern DECLSPEC void SDLCALL SDL_GLES_SwapBuffers(void);
+
+/** Sets a specific context attribute before calling SDL_CreateContext().
+  * @param attr
+  * @param value
+  * @return 0 if the attribute exists, -1 otherwise.
+  */
+extern DECLSPEC int SDLCALL SDL_GLES_SetAttribute(SDL_GLES_Attr attr, int value);
+
+/** Gets a context attribute from the current context, or from the wanted
+  * attribute set if no context is current.
+  * @param attr
+  * @param value pointer where the result will be stored.
+  * @return 0 if the attribute exists, -1 otherwise.
+  */
+extern DECLSPEC int SDLCALL SDL_GLES_GetAttribute(SDL_GLES_Attr attr, int *value);
 
 /* Ends C function definitions when using C++ */
 #ifdef __cplusplus

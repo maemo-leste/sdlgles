@@ -43,44 +43,45 @@ static const char * default_libgl[] = {
 	[SDL_GLES_VERSION_2_0] = "/usr/lib/libGLESv2.so"
 };
 
+/** SDL GFX display */
+static Display *display = NULL;
+/** EGLDisplay for the above X11 display */
+static EGLDisplay *egl_display = EGL_NO_DISPLAY;
+/** The current surface. Recreated by SDL_GLES_SetVideoMode(). */
+static EGLSurface egl_surface = EGL_NO_SURFACE;
+/** A pointer to the current active context. */
+static SDL_GLES_ContextPriv *cur_context = NULL;
+
+/** The desired GLES version, as selected by the SDL_GLES_Init() call. */
 static SDL_GLES_Version gl_version = SDL_GLES_VERSION_NONE;
+/** A handle to the dynamically loaded GL library. */
 static void* gl_handle = NULL;
+/** EGL version. */
 static EGLint egl_major, egl_minor;
 
-static Display *display = NULL;
-static EGLDisplay *egl_display = EGL_NO_DISPLAY;
-static EGLSurface egl_surface = EGL_NO_SURFACE;
+/** Your average countof() macro. */
+#define countof(a) (sizeof(a)/sizeof(a[0]))
+
+/** List of EGLConfig attributes we care about;
+  * Used for filtering; modified by SDL_GLES_Get/SetAttribute(). */
 static EGLint attrib_list[] = {
-	EGL_BUFFER_SIZE,			0,
-	EGL_RED_SIZE,				0,
-	EGL_GREEN_SIZE,				0,
-	EGL_BLUE_SIZE,				0,
-	EGL_LUMINANCE_SIZE,			0,
-	EGL_ALPHA_SIZE,				0,
-	EGL_CONFIG_CAVEAT,			EGL_DONT_CARE,
-	EGL_CONFIG_ID,				EGL_DONT_CARE,
-	EGL_DEPTH_SIZE,				0,
-	EGL_LEVEL,					0,
-	EGL_NATIVE_RENDERABLE,		EGL_DONT_CARE,
-	EGL_NATIVE_VISUAL_TYPE,		EGL_DONT_CARE,
-	EGL_RENDERABLE_TYPE,		0,
-	EGL_SAMPLE_BUFFERS,			0,
-	EGL_SAMPLES,				0,
-	EGL_STENCIL_SIZE,			0,
-	EGL_SURFACE_TYPE,			EGL_WINDOW_BIT,
-	EGL_TRANSPARENT_TYPE,		EGL_NONE,
-	EGL_TRANSPARENT_RED_VALUE,	EGL_DONT_CARE,
-	EGL_TRANSPARENT_GREEN_VALUE,EGL_DONT_CARE,
-	EGL_TRANSPARENT_BLUE_VALUE,	EGL_DONT_CARE,
+#define A(number, attrib, default_value) \
+	attrib, default_value,
+#include "attribs.inc"
+#undef A
 	EGL_NONE
 };
+/** A enum which maps A_EGL_* attrib constants to attrib_list positions. */
+typedef enum {
+#define A(number, attrib, default_value) \
+	A_ ## attrib = (number * 2),
+#include "attribs.inc"
+#undef A
+} attrib_enum;
 static EGLint context_attrib_list[] = {
 	EGL_CONTEXT_CLIENT_VERSION,	1,
 	EGL_NONE
 };
-static const int attrib_list_size = (sizeof(attrib_list) / sizeof(EGLint)) / 2;
-static const int context_attrib_list_size = (sizeof(context_attrib_list) / sizeof(EGLint)) / 2;
-static SDL_GLES_ContextPriv *cur_context = NULL;
 
 static const char * get_error_string(int error) {
 	switch (error) {
@@ -119,45 +120,25 @@ static const char * get_error_string(int error) {
     }
 }
 
-static int set_egl_attrib(EGLenum attrib, EGLint value)
+static inline void set_egl_attrib(attrib_enum attrib, EGLint value)
 {
-	const EGLint a = attrib;
-	int i;
-	for (i = 0; i < attrib_list_size; i++) {
-		if (attrib_list[i * 2] == a) {
-			attrib_list[(i*2)+1] = value;
-			return 0;
-		}
-	}
-
-	return -1;
+	const unsigned int i = (unsigned int)attrib + 1;
+	assert(i < countof(attrib_list));
+	attrib_list[i] = value;
 }
 
-static EGLint get_egl_attrib(EGLenum attrib)
+static inline EGLint get_egl_attrib(attrib_enum attrib)
 {
-	const EGLint a = attrib;
-	int i;
-	for (i = 0; i < attrib_list_size; i++) {
-		if (attrib_list[i * 2] == a) {
-			return attrib_list[(i*2)+1];
-		}
-	}
-
-	return -1;
+	const unsigned int i = (unsigned int)attrib + 1;
+	assert(i < countof(attrib_list));
+	return attrib_list[i];
 }
 
-static int set_egl_context_attrib(EGLenum attrib, EGLint value)
+static inline void set_egl_context_attrib(EGLenum attrib, EGLint value)
 {
-	const EGLint a = attrib;
-	int i;
-	for (i = 0; i < context_attrib_list_size; i++) {
-		if (context_attrib_list[i * 2] == a) {
-			context_attrib_list[(i*2)+1] = value;
-			return 0;
-		}
-	}
-
-	return -1;
+	/* Only one attribute supported here. */
+	assert(attrib == EGL_CONTEXT_CLIENT_VERSION);
+	context_attrib_list[1] = value;
 }
 
 int SDL_GLES_LoadLibrary(const char *path)
@@ -230,19 +211,16 @@ int SDL_GLES_Init(SDL_GLES_Version version)
 			/* OpenGL|ES 1.1 */
 			api_to_bind = EGL_OPENGL_ES_API;
 			/* filter non ES 1.0 renderable configurations */
-			res = set_egl_attrib(EGL_RENDERABLE_TYPE, EGL_OPENGL_ES_BIT) == 0;
-			assert(res);
+			set_egl_attrib(A_EGL_RENDERABLE_TYPE, EGL_OPENGL_ES_BIT);
 			/* default egl_context_client_version is OK */
 			break;
 		case SDL_GLES_VERSION_2_0:
 			/* OpenGL|ES 2.0 */
 			api_to_bind = EGL_OPENGL_ES_API; /* Note: no EGL_OPENGL_ES2_API */
 			/* filter non ES 2.0 renderable configurations */
-			res = set_egl_attrib(EGL_RENDERABLE_TYPE, EGL_OPENGL_ES2_BIT) == 0;
-			assert(res);
+			set_egl_attrib(A_EGL_RENDERABLE_TYPE, EGL_OPENGL_ES2_BIT);
 			/* and request GL ES 2.0 contexts */
-			res = set_egl_context_attrib(EGL_CONTEXT_CLIENT_VERSION, 2) == 0;
-			assert(res);
+			set_egl_context_attrib(EGL_CONTEXT_CLIENT_VERSION, 2);
 			break;
 		default:
 			SDL_SetError("Unsupported API version");
@@ -396,13 +374,55 @@ int SDL_GLES_MakeCurrent(SDL_GLES_Context* c)
 	res = SDL_GLES_SetVideoMode();
 	if (res != 0) return res; /* Surface (re-)creation failed. */
 
-	/* TODO Update attrib_list. Make SDL_GLES_GetAttribute work. */
-
 	return 0;
 }
 
 void SDL_GLES_SwapBuffers()
 {
 	eglSwapBuffers(egl_display, egl_surface);
+}
+
+/** A simple map between SDL_GLES_* attributes and EGL ones.
+  * More abstraction layers is always good.
+  */
+static const attrib_enum attrib_map[] = {
+	[SDL_GLES_BUFFER_SIZE]		= A_EGL_BUFFER_SIZE,
+	[SDL_GLES_RED_SIZE]			= A_EGL_RED_SIZE,
+	[SDL_GLES_GREEN_SIZE]		= A_EGL_GREEN_SIZE,
+	[SDL_GLES_BLUE_SIZE]		= A_EGL_BLUE_SIZE,
+	[SDL_GLES_ALPHA_SIZE]		= A_EGL_ALPHA_SIZE,
+	[SDL_GLES_LUMINANCE_SIZE]	= A_EGL_LUMINANCE_SIZE,
+	[SDL_GLES_DEPTH_SIZE]		= A_EGL_DEPTH_SIZE,
+	[SDL_GLES_STENCIL_SIZE]		= A_EGL_STENCIL_SIZE,
+};
+
+int SDL_GLES_SetAttribute(SDL_GLES_Attr attr, int value)
+{
+	if (attr >= countof(attrib_map)) return -1;
+	attrib_enum list_attr = attrib_map[attr];
+	set_egl_attrib(list_attr, value);
+	return 0;
+}
+
+int SDL_GLES_GetAttribute(SDL_GLES_Attr attr, int *value)
+{
+	if (attr >= countof(attrib_map)) return -1;
+	attrib_enum list_attr = attrib_map[attr];
+	if (cur_context) {
+		EGLenum egl_attr = attrib_list[list_attr];
+		EGLint egl_value = 0;
+		EGLBoolean res = eglGetConfigAttrib(egl_display,
+			cur_context->egl_config, egl_attr, &egl_value);
+		if (res) {
+			*value = egl_value;
+			return 0;
+		} else {
+			printf("Failed: %s\n", get_error_string(eglGetError()));
+			return -1;
+		}
+	} else {
+		*value = get_egl_attrib(list_attr);
+		return 0;
+	}
 }
 

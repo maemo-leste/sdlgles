@@ -6,7 +6,7 @@ TEST_CFLAGS:=$(shell sdl-config --cflags)
 TEST_1_LDLIBS:=-lGLES_CM
 TEST_2_LDLIBS:=-lGLESv2
 
-TESTS_1:=gles1
+TESTS_1:=gles1 attrib
 TESTS_2:=gles2
 TESTS:=$(TESTS_1) $(TESTS_2)
 
