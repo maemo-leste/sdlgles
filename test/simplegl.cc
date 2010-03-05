@@ -2,9 +2,9 @@
   * edited and commented by André Bergner [endboss]
   * edited by Javier for SDL_gles
   *
-  * librariries needed:   libgles2-dev, libsdl-gles1.2-dev, libsdl1.2-dev
+  * libraries needed: libgles2-dev | libgles2-sgx-img-dev, libsdl-gles1.2-dev, libsdl1.2-dev
   *
-  * compile with:   g++ -O2 -o simplegl `sdl-config --cflags --libs` -lSDL_gles -lGLESv2  simplegl.cc
+  * compile with: g++ -O2 -o simplegl  `sdl-config --cflags --libs` -lSDL_gles -lGLESv2  simplegl.cc
   */
 
 #include  <iostream>
