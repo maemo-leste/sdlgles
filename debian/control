@@ -1,7 +1,8 @@
 Source: sdlgles
 Priority: extra
 Maintainer: Javier S. Pedro <maemo@javispedro.com>
-Build-Depends: debhelper (>= 5), libxext-dev, libsdl1.2-dev
+Build-Depends: debhelper (>= 5), libx11-dev, libsdl1.2-dev,
+ libgles2-dev [i386], opengles-sgx-img-common-dev [armel]
 Standards-Version: 3.7.2
 Section: libs
 
