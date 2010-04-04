@@ -25,13 +25,17 @@
 extern "C" {
 #endif
 
+/** OpenGL ES versions compatible with this library. */
 typedef enum SDL_GLES_Version
 {
 	SDL_GLES_VERSION_NONE = 0,
+	/** OpenGL ES 1.1 */
 	SDL_GLES_VERSION_1_1 = 1,
+	/** OpenGL ES 2.0 */
 	SDL_GLES_VERSION_2_0 = 2
 } SDL_GLES_Version;
 
+/** Context attributes. */
 typedef enum SDL_GLES_Attr
 {
 	SDL_GLES_BUFFER_SIZE = 0,
@@ -44,17 +48,26 @@ typedef enum SDL_GLES_Attr
 	SDL_GLES_STENCIL_SIZE
 } SDL_GLES_Attr;
 
+/** Represents a EGL context.
+    A context is where all textures, etc. are stored.
+  */
 typedef struct SDL_GLES_Context
 {
 	/* Opaque pointer to an EGLContext */
 } SDL_GLES_Context;
 
 /** Invoke after SDL_Init.
-	@return 0 if SDL_gles was initialized correctly.
+    You need to call this before any other routine in this library.
+    @param version selects the OpenGL ES version to use.
+	@return 0 if SDL_gles was initialized correctly; any other value
+	  if the initialization failed. You can then check for errrors using
+	  SDL_GetError().
   */
 extern DECLSPEC int SDLCALL SDL_GLES_Init(SDL_GLES_Version version);
 
 /** Invoke just before SDL_Quit.
+    Closes the connection with the graphics accelerator. After a call to 
+    SDL_GLES_Quit(), you must not call any other function in this library.
   */
 extern DECLSPEC void SDLCALL SDL_GLES_Quit();
 
@@ -65,7 +78,7 @@ extern DECLSPEC void SDLCALL SDL_GLES_Quit();
   */
 extern DECLSPEC int SDLCALL SDL_GLES_LoadLibrary(const char *path);
 /** Returns the address of a symbol in the loaded GL ES library.
-  * @param name of the symbol to look up.
+  * @param proc name of the symbol to look up.
   * @return address of the symbol or NULL.
   */
 extern DECLSPEC void* SDLCALL SDL_GLES_GetProcAddress(const char *proc);
@@ -98,16 +111,16 @@ extern DECLSPEC int SDLCALL SDL_GLES_MakeCurrent(SDL_GLES_Context *context);
   */
 extern DECLSPEC void SDLCALL SDL_GLES_SwapBuffers(void);
 
-/** Sets a specific context attribute before calling SDL_CreateContext().
-  * @param attr
-  * @param value
+/** Sets a specific context attribute (before calling SDL_CreateContext()).
+  * @param attr attribute to set
+  * @param value new value
   * @return 0 if the attribute exists, -1 otherwise.
   */
 extern DECLSPEC int SDLCALL SDL_GLES_SetAttribute(SDL_GLES_Attr attr, int value);
 
 /** Gets a context attribute from the current context, or from the wanted
   * attribute set if no context is current.
-  * @param attr
+  * @param attr attribute to get
   * @param value pointer where the result will be stored.
   * @return 0 if the attribute exists, -1 otherwise.
   */
