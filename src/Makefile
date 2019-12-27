@@ -1,7 +1,8 @@
 PREFIX:=$(shell sdl-config --prefix)
-CFLAGS:=-g -O0 -Wall -Wextra
+CFLAGS:=-g -O2 -Wall -Wextra
 
 CC:=gcc
+LIBTOOL=libtool
 
 RELEASE:=1.2
 VERSION:=0:1:0
