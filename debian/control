@@ -1,8 +1,7 @@
 Source: sdlgles
 Priority: extra
 Maintainer: Javier S. Pedro <maemo@javispedro.com>
-Build-Depends: debhelper (>= 5), libx11-dev, libsdl1.2-dev,
- libgles2-dev [i386], opengles-sgx-img-common-dev [armel]
+Build-Depends: debhelper (>= 5), libx11-dev, libsdl1.2-dev, libgles2-mesa-dev
 Standards-Version: 3.7.2
 Section: libs
 
@@ -17,7 +16,7 @@ Description: OpenGL|ES library for Simple DirectMedia Layer 1.2
 Package: libsdl-gles1.2-dev
 Section: libdevel
 Architecture: any
-Depends: libsdl-gles1.2-1 (= ${Source-Version})
+Depends: libsdl-gles1.2-1 (= ${source:Version})
 Description: development files for OpenGL|ES library for SDL 1.2
  This is a simple library that allows you to use OpenGL|ES (1.1 or 2.0) calls
  in your SDL applications, hiding the EGL surface creation from you.
