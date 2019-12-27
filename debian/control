@@ -1,7 +1,7 @@
 Source: sdlgles
 Priority: extra
 Maintainer: Javier S. Pedro <maemo@javispedro.com>
-Build-Depends: debhelper (>= 5), libx11-dev, libsdl1.2-dev, libgles2-mesa-dev, libtool
+Build-Depends: debhelper (>= 5), libx11-dev, libsdl1.2-dev, libgles2-mesa-dev, libtool-bin
 Standards-Version: 3.7.2
 Section: libs
 
