@@ -1,3 +1,9 @@
+sdlgles (1.0.1) unstable; urgency=low
+
+  * Initial release for Leste
+
+ -- Merlijn Wajer <merlijn@wizzup.org>  Fri, 27 Dec 2019 21:12:58 +0100
+
 sdlgles (1.0.0) unstable; urgency=low
 
   * Initial Release.
